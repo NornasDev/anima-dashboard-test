@@ -3,97 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ánima Telemetry V3</title>
+    <title>Ánima Telemetry V4 - Launch Control</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <style>
         body {
             background-color: #0a0a0a; color: #00ffcc;
             font-family: 'Courier New', Courier, monospace;
-            text-align: center; margin: 0; padding: 15px;
+            text-align: center; margin: 0; padding: 10px;
             display: flex; flex-direction: column;
             justify-content: space-between; height: 95vh; 
         }
 
         .contenedor-medidores { 
-            display: flex; flex-direction: column; gap: 10px; 
+            display: flex; flex-direction: row; flex-wrap: wrap; 
+            justify-content: center; gap: 10px; width: 100%;
         }
 
         .medidor { 
             background: rgba(255,255,255,0.05); 
-            border-radius: 10px; padding: 10px;
+            border-radius: 10px; padding: 10px; width: 45%;
         }
 
-        .valor-gigante { 
-            font-size: 4rem; /* Un poco más pequeño para que quepan todos */
-            font-weight: bold; margin: 5px 0; color: #ffffff; 
-        }
+        /* Semáforo Launch Control */
+        .semaforo-container { width: 95%; display: flex; justify-content: space-around; align-items: center; border: 2px solid #444; }
+        .luces { display: flex; gap: 15px; }
+        .luz { width: 40px; height: 40px; border-radius: 50%; background-color: #222; border: 2px solid #000; box-shadow: inset 0 0 10px #000; }
+        .luz.rojo-on { background-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
+        .luz.verde-on { background-color: #00ff00; box-shadow: 0 0 20px #00ff00; }
+        .texto-launch { font-size: 1.5rem; font-weight: bold; color: #888; }
 
-        .etiqueta { 
-            font-size: 0.9rem; color: #888; 
-            text-transform: uppercase; letter-spacing: 1px; 
-        }
+        .valor-gigante { font-size: 3rem; font-weight: bold; margin: 5px 0; color: #ffffff; }
+        .etiqueta { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
         
         .crono-container { border: 2px solid #ffaa00; }
-        .valor-crono { font-size: 2.5rem; color: #ffaa00; font-weight: bold; margin: 5px 0;}
-        #estado-0-60 { color: #ffaa00; }
+        .valor-crono { font-size: 2rem; color: #ffaa00; font-weight: bold; margin: 5px 0;}
 
-        .panel-botones { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-        button { padding: 15px; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 10px; text-transform: uppercase; cursor: pointer; }
+        .panel-botones { display: flex; flex-direction: row; gap: 10px; margin-top: 10px; justify-content: center; width: 100%;}
+        button { padding: 15px; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 10px; text-transform: uppercase; cursor: pointer; width: 45%; }
         #btn-iniciar { background-color: #00ffcc; color: #000; }
         #btn-detener { background-color: #ff3366; color: #fff; display: none; }
-        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 5px;}
+        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 5px; width: 100%;}
 
         @media (orientation: landscape) {
-            body { flex-direction: row; align-items: center; justify-content: space-around; text-align: left; }
-            .contenedor-medidores { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 70%; }
-            .medidor { width: 30%; text-align: center; padding: 5px;}
-            .panel-botones { width: 25%; }
-            .valor-gigante { font-size: 3.5rem; }
+            .medidor { width: 22%; }
+            .semaforo-container { width: 40%; }
+            .crono-container { width: 25%; }
         }
     </style>
 </head>
 <body>
 
-    <div>
-        <div id="estado">● GRABANDO TELEMETRÍA</div>
-            
-        <div class="contenedor-medidores">
-            <div class="medidor">
-                <div class="etiqueta">Velocidad</div>
-                <div class="valor-gigante" id="display-velocidad">0</div>
-                <div class="etiqueta">KM/H</div>
+    <div id="estado">● GRABANDO TELEMETRÍA</div>
+        
+    <div class="contenedor-medidores">
+        
+        <div class="medidor semaforo-container">
+            <div class="texto-launch" id="texto-semaforo">STANDBY</div>
+            <div class="luces">
+                <div class="luz" id="luz-roja"></div>
+                <div class="luz" id="luz-verde"></div>
             </div>
+        </div>
 
-            <div class="medidor">
-                <div class="etiqueta">Inclinación</div>
-                <div class="valor-gigante" id="display-angulo">0°</div>
-                <div class="etiqueta">Roll</div>
-            </div>
+        <div class="medidor">
+            <div class="etiqueta">Velocidad</div>
+            <div class="valor-gigante" id="display-velocidad">0</div>
+        </div>
 
-            <div class="medidor">
-                <div class="etiqueta">Vel. Máxima</div>
-                <div class="valor-gigante" id="display-vel-max" style="color: #ff3366;">0</div>
-                <div class="etiqueta">KM/H</div>
-            </div>
+        <div class="medidor">
+            <div class="etiqueta">Inclinación</div>
+            <div class="valor-gigante" id="display-angulo">0°</div>
+        </div>
 
-            <div class="medidor">
-                <div class="etiqueta">Distancia</div>
-                <div class="valor-gigante" id="display-distancia" style="color: #00ff00;">0.00</div>
-                <div class="etiqueta">KM</div>
-            </div>
+        <div class="medidor crono-container">
+            <div class="etiqueta">0 - 60 KM/H</div>
+            <div class="valor-crono" id="display-0-60">-- s</div>
+        </div>
 
-            <div class="medidor crono-container">
-                <div class="etiqueta">0 - 60 KM/H</div>
-                <div class="valor-crono" id="display-0-60">-- s</div>
-                <div class="etiqueta" id="estado-0-60">Esperando...</div>
-            </div>
+        <div class="medidor crono-container">
+            <div class="etiqueta">0 - 100 KM/H</div>
+            <div class="valor-crono" id="display-0-100">-- s</div>
         </div>
     </div>
 
     <div class="panel-botones">
-        <button id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar Viaje</button>
-        <button id="btn-detener" onclick="descargarCSV()">Finalizar y Descargar</button>
+        <button id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar</button>
+        <button id="btn-detener" onclick="descargarCSV()">Finalizar</button>
     </div>
 
     <script src="app.js"></script>

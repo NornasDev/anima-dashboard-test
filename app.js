@@ -1,65 +1,45 @@
 // ==========================================
-// 1. VARIABLES DE ESTADO Y MEMORIA
+// VARIABLES DE ESTADO Y MEMORIA
 // ==========================================
 let registroViaje = [];
 let grabando = false;
 let gpsWatchId = null;
 let intervaloGrabacion = null;
 
-// Variables Físicas Actuales
 let velocidadActual = 0;
 let inclinacionActual = 0;
-let latitudActual = 0;
-let longitudActual = 0;
 
-// Variables para Nuevas Métricas
-let velocidadMaxima = 0;
-let distanciaTotal = 0; // En Kilómetros
-let latitudAnterior = null;
-let longitudAnterior = null;
-
-// Variables para Lógica del Cronómetro 0-60
-let midiendo0_60 = false;
-let tiempoInicio0_60 = 0;
+// Variables de Drag Race (Launch Control)
+let midiendoAceleracion = false;
+let tiempoInicioLanzamiento = 0;
+let meta60Alcanzada = false;
+let meta100Alcanzada = false;
+let maxVelocidadLanzamiento = 0; // NUEVO: Para saber cuál fue el pico antes de frenar
 
 // Referencias HTML
 const displayVel = document.getElementById('display-velocidad');
 const displayAngulo = document.getElementById('display-angulo');
-const displayVelMax = document.getElementById('display-vel-max');
-const displayDistancia = document.getElementById('display-distancia');
 const display0_60 = document.getElementById('display-0-60');
-const estado0_60 = document.getElementById('estado-0-60');
+const display0_100 = document.getElementById('display-0-100');
 const btnIniciar = document.getElementById('btn-iniciar');
 const btnDetener = document.getElementById('btn-detener');
 const estadoGrabacion = document.getElementById('estado');
 
-// ==========================================
-// PANTALLA COMPLETA
-// ==========================================
+// Semáforo UI
+const luzRoja = document.getElementById('luz-roja');
+const luzVerde = document.getElementById('luz-verde');
+const textoSemaforo = document.getElementById('texto-semaforo');
+
+// Pantalla Completa
 function activarPantallaCompleta() {
-    let elemento = document.documentElement;
-    if (elemento.requestFullscreen) elemento.requestFullscreen();
-    else if (elemento.webkitRequestFullscreen) elemento.webkitRequestFullscreen();
+    let el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 }
 
 function salirPantallaCompleta() {
     if (document.exitFullscreen) document.exitFullscreen();
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-}
-
-// ==========================================
-// MATEMÁTICAS GEOLOCALES (Haversine)
-// ==========================================
-// Calcula la distancia exacta en la curvatura de la Tierra
-function calcularDistanciaHaversine(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radio de la Tierra en kilómetros
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
 }
 
 // ==========================================
@@ -74,29 +54,20 @@ function iniciarTelemetria() {
     
     grabando = true;
     registroViaje = []; 
-    
-    // Reiniciar contadores para un viaje nuevo
-    velocidadMaxima = 0;
-    distanciaTotal = 0;
-    latitudAnterior = null;
-    longitudAnterior = null;
-    displayVelMax.innerText = "0";
-    displayDistancia.innerText = "0.00";
 
     window.addEventListener('deviceorientation', manejarInclinacion);
+    window.addEventListener('devicemotion', manejarAcelerometro); 
 
     if ("geolocation" in navigator) {
         gpsWatchId = navigator.geolocation.watchPosition(
             manejarGPS, manejarErrorGPS, 
             { enableHighAccuracy: true, maximumAge: 0 }
         );
-    } else { alert("Tu navegador no soporta geolocalización GPS."); }
+    } else { alert("Tu navegador no soporta GPS."); }
 
     intervaloGrabacion = setInterval(() => {
         registroViaje.push({
             tiempo: new Date().toISOString(),
-            latitud: latitudActual,
-            longitud: longitudActual,
             velocidad_kmh: velocidadActual,
             inclinacion_grados: inclinacionActual
         });
@@ -104,75 +75,151 @@ function iniciarTelemetria() {
 }
 
 // ==========================================
-// PROCESAMIENTO MATEMÁTICO DE SENSORES
+// LÓGICA DE LANZAMIENTO Y ABORTO
+// ==========================================
+function dispararLaunchControl() {
+    midiendoAceleracion = true;
+    meta60Alcanzada = false;
+    meta100Alcanzada = false;
+    maxVelocidadLanzamiento = 0; // Reiniciamos el pico para el nuevo intento
+    tiempoInicioLanzamiento = performance.now(); 
+
+    // UI: Semáforo Verde
+    luzRoja.classList.remove('rojo-on');
+    luzVerde.classList.add('verde-on');
+    textoSemaforo.innerText = "¡LAUNCH!";
+    textoSemaforo.style.color = "#00ff00";
+    
+    display0_60.innerText = "Midiendo...";
+    display0_100.innerText = "Midiendo...";
+    display0_60.style.color = "#ffaa00";
+    display0_100.style.color = "#ffaa00";
+}
+
+function abortarLaunchControl(motivo) {
+    midiendoAceleracion = false;
+
+    // UI: Semáforo Apagado/Abortado
+    luzVerde.classList.remove('verde-on');
+    textoSemaforo.innerText = "ABORTO";
+    textoSemaforo.style.color = "#ff3366";
+
+    // Limpiamos los textos de las metas que no se alcanzaron
+    if (!meta60Alcanzada) {
+        display0_60.innerText = "-- s";
+        display0_60.style.color = "#ffaa00";
+    }
+    if (!meta100Alcanzada) {
+        display0_100.innerText = "-- s";
+        display0_100.style.color = "#ffaa00";
+    }
+    
+    console.log("Intento descartado por:", motivo);
+}
+
+function manejarAcelerometro(evento) {
+    if (!grabando) return;
+
+    if (velocidadActual === 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
+        let acc = evento.acceleration; 
+        if (!acc || acc.x === null) return; 
+
+        let fuerzaMovimiento = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
+
+        if (fuerzaMovimiento > 2.5) {
+            dispararLaunchControl();
+        }
+    }
+}
+
+// ==========================================
+// LÓGICA DEL GPS Y VALIDACIÓN
 // ==========================================
 function manejarInclinacion(evento) {
     if (!grabando) return;
     let orientacion = (screen.orientation || {}).angle || window.orientation || 0;
     let roll = (orientacion === 90 || orientacion === -90) ? evento.beta : evento.gamma;
-    if (roll !== null) {
-        inclinacionActual = Math.round(roll);
-        displayAngulo.innerText = inclinacionActual + "°";
-    }
+    if (roll !== null) displayAngulo.innerText = Math.round(roll) + "°";
 }
 
 function manejarGPS(posicion) {
     if (!grabando) return;
-
-    latitudActual = posicion.coords.latitude;
-    longitudActual = posicion.coords.longitude;
 
     let velocidad_ms = posicion.coords.speed;
     if (velocidad_ms === null || velocidad_ms < 0) velocidad_ms = 0;
     velocidadActual = Math.round(velocidad_ms * 3.6);
     displayVel.innerText = velocidadActual;
 
-    // 1. Lógica de Velocidad Máxima
-    if (velocidadActual > velocidadMaxima) {
-        velocidadMaxima = velocidadActual;
-        displayVelMax.innerText = velocidadMaxima;
+    // 1. ESTADO DE REPOSO: Armar el semáforo
+    if (velocidadActual === 0) {
+        if (midiendoAceleracion) abortarLaunchControl("Detención total");
+        midiendoAceleracion = false;
+        
+        luzVerde.classList.remove('verde-on');
+        luzRoja.classList.add('rojo-on');
+        textoSemaforo.innerText = "ARMADO";
+        textoSemaforo.style.color = "#ff0000";
+    } 
+    // 2. DISPARO POR GPS (Si el acelerómetro no lo captó)
+    else if (velocidadActual > 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
+        dispararLaunchControl();
     }
 
-    // 2. Lógica de Distancia Recorrida
-    if (latitudAnterior !== null && longitudAnterior !== null) {
-        // Filtro: Solo sumamos distancia si la moto se mueve a más de 2 km/h (evita deriva GPS en semáforos)
-        if (velocidadActual > 2) {
-            let tramo = calcularDistanciaHaversine(latitudAnterior, longitudAnterior, latitudActual, longitudActual);
-            distanciaTotal += tramo;
-            displayDistancia.innerText = distanciaTotal.toFixed(2);
+    // 3. EVALUACIÓN CONSTANTE DURANTE EL JALÓN
+    if (midiendoAceleracion) {
+        let tiempoActual = performance.now();
+        let transcurrido = ((tiempoActual - tiempoInicioLanzamiento) / 1000).toFixed(2);
+
+        // Guardamos el pico máximo de velocidad de este intento
+        if (velocidadActual > maxVelocidadLanzamiento) {
+            maxVelocidadLanzamiento = velocidadActual;
+        }
+
+        // --- SISTEMA DE ABORTO AUTOMÁTICO ---
+        
+        // Regla 1: Desaceleración (Damos un margen de 3km/h por si el GPS salta un poco, pero si baja más, abortamos)
+        if (velocidadActual <= maxVelocidadLanzamiento - 3) {
+            abortarLaunchControl("Pérdida de aceleración detectada");
+            return; 
+        }
+
+        // Regla 2: Arranque de tráfico normal (Si van 12 segs y ni siquiera pasa los 40km/h)
+        if (transcurrido > 12 && velocidadActual < 40) {
+            abortarLaunchControl("Aceleración insuficiente");
+            return;
+        }
+
+        // Regla 3: Timeout general (Si van 40 segs y no llega a 100km/h, es porque es el límite de la moto o la vía)
+        if (transcurrido > 40 && !meta100Alcanzada) {
+            abortarLaunchControl("Tiempo límite de pista excedido");
+            return;
+        }
+
+        // --- CRUCE DE METAS EXITOSAS ---
+
+        // Cruce de meta 60 km/h
+        if (velocidadActual >= 60 && !meta60Alcanzada) {
+            meta60Alcanzada = true;
+            display0_60.innerText = transcurrido + "s";
+            display0_60.style.color = "#00ff00";
+        }
+
+        // Cruce de meta 100 km/h
+        if (velocidadActual >= 100 && !meta100Alcanzada) {
+            meta100Alcanzada = true;
+            display0_100.innerText = transcurrido + "s";
+            display0_100.style.color = "#00ff00";
+            
+            // Apagamos la medición porque ya cruzó la meta final
+            midiendoAceleracion = false;
+            luzVerde.classList.remove('verde-on');
+            textoSemaforo.innerText = "COMPLETADO";
+            textoSemaforo.style.color = "#888";
         }
     }
-    // Guardamos la coordenada actual para compararla en el siguiente latido del GPS
-    latitudAnterior = latitudActual;
-    longitudAnterior = longitudActual;
-
-    // 3. Lógica del Cronómetro 0-60 KM/H
-    if (velocidadActual === 0) {
-        midiendo0_60 = false;
-        estado0_60.innerText = "¡Armado, acelera!";
-        estado0_60.style.color = "#00ffcc";
-        display0_60.innerText = "-- s";
-    } 
-    else if (velocidadActual > 0 && velocidadActual < 60 && !midiendo0_60) {
-        midiendo0_60 = true;
-        tiempoInicio0_60 = performance.now(); 
-        estado0_60.innerText = "Midiendo...";
-        estado0_60.style.color = "#ffaa00";
-    } 
-    else if (velocidadActual >= 60 && midiendo0_60) {
-        midiendo0_60 = false;
-        let tiempoFinal = performance.now();
-        let segundos = ((tiempoFinal - tiempoInicio0_60) / 1000).toFixed(2);
-        display0_60.innerText = segundos + "s";
-        estado0_60.innerText = "¡Tiempo registrado!";
-        estado0_60.style.color = "#00ff00";
-    }
 }
 
-function manejarErrorGPS(error) { 
-    console.warn('Advertencia GPS:', error.message); 
-    displayVel.innerText = "ERR";
-}
+function manejarErrorGPS(error) { displayVel.innerText = "ERR"; }
 
 // ==========================================
 // EXPORTACIÓN DE DATOS
@@ -181,6 +228,7 @@ function descargarCSV() {
     salirPantallaCompleta();
     grabando = false;
     window.removeEventListener('deviceorientation', manejarInclinacion);
+    window.removeEventListener('devicemotion', manejarAcelerometro);
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
     clearInterval(intervaloGrabacion);
 
@@ -188,22 +236,17 @@ function descargarCSV() {
     btnDetener.style.display = 'none';
     estadoGrabacion.style.visibility = 'hidden';
 
-    if (registroViaje.length === 0) {
-        alert("No se grabaron datos de telemetría.");
-        return;
-    }
+    if (registroViaje.length === 0) return;
 
-    let contenidoCSV = "Tiempo,Latitud,Longitud,Velocidad_KMH,Inclinacion_Grados\n";
+    let contenidoCSV = "Tiempo,Velocidad_KMH,Inclinacion_Grados\n";
     registroViaje.forEach(fila => {
-        contenidoCSV += `${fila.tiempo},${fila.latitud},${fila.longitud},${fila.velocidad_kmh},${fila.inclinacion_grados}\n`;
+        contenidoCSV += `${fila.tiempo},${fila.velocidad_kmh},${fila.inclinacion_grados}\n`;
     });
 
     const blob = new Blob([contenidoCSV], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = window.URL.createObjectURL(blob);
     a.download = `ruta_NKD_${new Date().getTime()}.csv`;
-    
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
