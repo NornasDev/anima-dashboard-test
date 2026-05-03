@@ -1,0 +1,8 @@
+{
+  "name": "Ánima Telemetry V2",
+  "short_name": "Ánima",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a"
+}
