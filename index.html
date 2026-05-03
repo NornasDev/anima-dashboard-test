@@ -3,99 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ánima Telemetry V2</title>
+    <title>Ánima Telemetry V3</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <style>
-        /* ==========================================
-           DISEÑO BASE (Vertical / Portrait)
-           ========================================== */
         body {
-            background-color: #0a0a0a;
-            color: #00ffcc; /* Cyan de alto contraste */
+            background-color: #0a0a0a; color: #00ffcc;
             font-family: 'Courier New', Courier, monospace;
-            text-align: center;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 90vh; 
+            text-align: center; margin: 0; padding: 15px;
+            display: flex; flex-direction: column;
+            justify-content: space-between; height: 95vh; 
         }
 
         .contenedor-medidores { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
+            display: flex; flex-direction: column; gap: 10px; 
         }
 
         .medidor { 
-            margin-top: 10px; 
             background: rgba(255,255,255,0.05); 
-            border-radius: 10px; 
-            padding: 10px;
+            border-radius: 10px; padding: 10px;
         }
 
         .valor-gigante { 
-            font-size: 5rem; 
-            font-weight: bold; 
-            margin: 5px 0; 
-            color: #ffffff; 
+            font-size: 4rem; /* Un poco más pequeño para que quepan todos */
+            font-weight: bold; margin: 5px 0; color: #ffffff; 
         }
 
         .etiqueta { 
-            font-size: 1rem; 
-            color: #888; 
-            text-transform: uppercase; 
-            letter-spacing: 2px; 
+            font-size: 0.9rem; color: #888; 
+            text-transform: uppercase; letter-spacing: 1px; 
         }
         
-        /* Estilos del cronómetro 0-60 */
         .crono-container { border: 2px solid #ffaa00; }
-        .valor-crono { font-size: 3rem; color: #ffaa00; font-weight: bold; margin: 10px 0;}
+        .valor-crono { font-size: 2.5rem; color: #ffaa00; font-weight: bold; margin: 5px 0;}
         #estado-0-60 { color: #ffaa00; }
 
-        /* Panel de botones masivos */
-        .panel-botones { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
-        
-        button { 
-            padding: 20px; 
-            font-size: 1.5rem; 
-            font-weight: bold; 
-            border: none; 
-            border-radius: 10px; 
-            text-transform: uppercase; 
-            cursor: pointer; 
-        }
-        
+        .panel-botones { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+        button { padding: 15px; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 10px; text-transform: uppercase; cursor: pointer; }
         #btn-iniciar { background-color: #00ffcc; color: #000; }
         #btn-detener { background-color: #ff3366; color: #fff; display: none; }
-        
-        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 10px;}
+        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 5px;}
 
-        /* ==========================================
-           MODO HORIZONTAL (Landscape Adaptativo para manillar)
-           ========================================== */
         @media (orientation: landscape) {
-            body { 
-                flex-direction: row; 
-                align-items: center; 
-                justify-content: space-around; 
-                text-align: left; 
-            }
-            .contenedor-medidores { 
-                flex-direction: row; 
-                flex-wrap: wrap; 
-                justify-content: center; 
-                width: 65%; 
-            }
-            .medidor { 
-                width: 42%; 
-                text-align: center; 
-            }
-            .panel-botones { 
-                width: 30%; 
-            }
+            body { flex-direction: row; align-items: center; justify-content: space-around; text-align: left; }
+            .contenedor-medidores { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 70%; }
+            .medidor { width: 30%; text-align: center; padding: 5px;}
+            .panel-botones { width: 25%; }
+            .valor-gigante { font-size: 3.5rem; }
         }
     </style>
 </head>
@@ -115,6 +69,18 @@
                 <div class="etiqueta">Inclinación</div>
                 <div class="valor-gigante" id="display-angulo">0°</div>
                 <div class="etiqueta">Roll</div>
+            </div>
+
+            <div class="medidor">
+                <div class="etiqueta">Vel. Máxima</div>
+                <div class="valor-gigante" id="display-vel-max" style="color: #ff3366;">0</div>
+                <div class="etiqueta">KM/H</div>
+            </div>
+
+            <div class="medidor">
+                <div class="etiqueta">Distancia</div>
+                <div class="valor-gigante" id="display-distancia" style="color: #00ff00;">0.00</div>
+                <div class="etiqueta">KM</div>
             </div>
 
             <div class="medidor crono-container">
