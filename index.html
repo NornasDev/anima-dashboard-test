@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ánima Telemetry V2</title>
+    <style>
+        /* ==========================================
+           DISEÑO BASE (Vertical / Portrait)
+           ========================================== */
+        body {
+            background-color: #0a0a0a;
+            color: #00ffcc; /* Cyan de alto contraste */
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 90vh; 
+        }
+
+        .contenedor-medidores { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+        }
+
+        .medidor { 
+            margin-top: 10px; 
+            background: rgba(255,255,255,0.05); 
+            border-radius: 10px; 
+            padding: 10px;
+        }
+
+        .valor-gigante { 
+            font-size: 5rem; 
+            font-weight: bold; 
+            margin: 5px 0; 
+            color: #ffffff; 
+        }
+
+        .etiqueta { 
+            font-size: 1rem; 
+            color: #888; 
+            text-transform: uppercase; 
+            letter-spacing: 2px; 
+        }
+        
+        /* Estilos del cronómetro 0-60 */
+        .crono-container { border: 2px solid #ffaa00; }
+        .valor-crono { font-size: 3rem; color: #ffaa00; font-weight: bold; margin: 10px 0;}
+        #estado-0-60 { color: #ffaa00; }
+
+        /* Panel de botones masivos */
+        .panel-botones { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        
+        button { 
+            padding: 20px; 
+            font-size: 1.5rem; 
+            font-weight: bold; 
+            border: none; 
+            border-radius: 10px; 
+            text-transform: uppercase; 
+            cursor: pointer; 
+        }
+        
+        #btn-iniciar { background-color: #00ffcc; color: #000; }
+        #btn-detener { background-color: #ff3366; color: #fff; display: none; }
+        
+        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 10px;}
+
+        /* ==========================================
+           MODO HORIZONTAL (Landscape Adaptativo para manillar)
+           ========================================== */
+        @media (orientation: landscape) {
+            body { 
+                flex-direction: row; 
+                align-items: center; 
+                justify-content: space-around; 
+                text-align: left; 
+            }
+            .contenedor-medidores { 
+                flex-direction: row; 
+                flex-wrap: wrap; 
+                justify-content: center; 
+                width: 65%; 
+            }
+            .medidor { 
+                width: 42%; 
+                text-align: center; 
+            }
+            .panel-botones { 
+                width: 30%; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+        <div id="estado">● GRABANDO TELEMETRÍA</div>
+            
+        <div class="contenedor-medidores">
+            <div class="medidor">
+                <div class="etiqueta">Velocidad</div>
+                <div class="valor-gigante" id="display-velocidad">0</div>
+                <div class="etiqueta">KM/H</div>
+            </div>
+
+            <div class="medidor">
+                <div class="etiqueta">Inclinación</div>
+                <div class="valor-gigante" id="display-angulo">0°</div>
+                <div class="etiqueta">Roll</div>
+            </div>
+
+            <div class="medidor crono-container">
+                <div class="etiqueta">0 - 60 KM/H</div>
+                <div class="valor-crono" id="display-0-60">-- s</div>
+                <div class="etiqueta" id="estado-0-60">Esperando...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-botones">
+        <button id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar Viaje</button>
+        <button id="btn-detener" onclick="descargarCSV()">Finalizar y Descargar</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
