@@ -14,7 +14,10 @@ let midiendoAceleracion = false;
 let tiempoInicioLanzamiento = 0;
 let meta60Alcanzada = false;
 let meta100Alcanzada = false;
-let maxVelocidadLanzamiento = 0; // NUEVO: Para saber cuál fue el pico antes de frenar
+let maxVelocidadLanzamiento = 0; 
+
+// Variable para no repetir el mismo audio del semáforo mil veces
+let semaforoAnunciado = false; 
 
 // Referencias HTML
 const displayVel = document.getElementById('display-velocidad');
@@ -25,12 +28,30 @@ const btnIniciar = document.getElementById('btn-iniciar');
 const btnDetener = document.getElementById('btn-detener');
 const estadoGrabacion = document.getElementById('estado');
 
-// Semáforo UI
 const luzRoja = document.getElementById('luz-roja');
 const luzVerde = document.getElementById('luz-verde');
 const textoSemaforo = document.getElementById('texto-semaforo');
 
-// Pantalla Completa
+// ==========================================
+// EL MÓDULO DE VOZ (JARVIS)
+// ==========================================
+function hablar(texto) {
+    if ('speechSynthesis' in window) {
+        // Cancelamos cualquier audio anterior para que hable de inmediato
+        window.speechSynthesis.cancel();
+        
+        let mensaje = new SpeechSynthesisUtterance(texto);
+        mensaje.lang = 'es-MX'; // Español (puedes probar 'es-ES' si prefieres acento de España)
+        mensaje.rate = 1.3;     // Velocidad: 1.0 es normal, 1.3 es un poco más táctico/rápido
+        mensaje.pitch = 1.0;    // Tono de voz
+        
+        window.speechSynthesis.speak(mensaje);
+    }
+}
+
+// ==========================================
+// CONTROL DE PANTALLA
+// ==========================================
 function activarPantallaCompleta() {
     let el = document.documentElement;
     if (el.requestFullscreen) el.requestFullscreen();
@@ -48,12 +69,16 @@ function salirPantallaCompleta() {
 function iniciarTelemetria() {
     activarPantallaCompleta();
     
+    // JARVIS: Saludo inicial al presionar el botón
+    hablar("Sistemas en línea. Grabando telemetría.");
+    
     btnIniciar.style.display = 'none';
     btnDetener.style.display = 'block';
     estadoGrabacion.style.visibility = 'visible';
     
     grabando = true;
     registroViaje = []; 
+    semaforoAnunciado = false;
 
     window.addEventListener('deviceorientation', manejarInclinacion);
     window.addEventListener('devicemotion', manejarAcelerometro); 
@@ -81,10 +106,12 @@ function dispararLaunchControl() {
     midiendoAceleracion = true;
     meta60Alcanzada = false;
     meta100Alcanzada = false;
-    maxVelocidadLanzamiento = 0; // Reiniciamos el pico para el nuevo intento
+    maxVelocidadLanzamiento = 0; 
     tiempoInicioLanzamiento = performance.now(); 
 
-    // UI: Semáforo Verde
+    // JARVIS: Confirma el inicio del cronómetro
+    hablar("¡Vamos!");
+
     luzRoja.classList.remove('rojo-on');
     luzVerde.classList.add('verde-on');
     textoSemaforo.innerText = "¡LAUNCH!";
@@ -99,12 +126,17 @@ function dispararLaunchControl() {
 function abortarLaunchControl(motivo) {
     midiendoAceleracion = false;
 
-    // UI: Semáforo Apagado/Abortado
+    // JARVIS: Te avisa por qué cortó la medición
+    if (motivo === "Detención total" || motivo === "Pérdida de aceleración detectada") {
+        hablar("Abortado");
+    } else {
+        hablar("Tiempo excedido");
+    }
+
     luzVerde.classList.remove('verde-on');
     textoSemaforo.innerText = "ABORTO";
     textoSemaforo.style.color = "#ff3366";
 
-    // Limpiamos los textos de las metas que no se alcanzaron
     if (!meta60Alcanzada) {
         display0_60.innerText = "-- s";
         display0_60.style.color = "#ffaa00";
@@ -113,19 +145,14 @@ function abortarLaunchControl(motivo) {
         display0_100.innerText = "-- s";
         display0_100.style.color = "#ffaa00";
     }
-    
-    console.log("Intento descartado por:", motivo);
 }
 
 function manejarAcelerometro(evento) {
     if (!grabando) return;
-
     if (velocidadActual === 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
         let acc = evento.acceleration; 
         if (!acc || acc.x === null) return; 
-
         let fuerzaMovimiento = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
-
         if (fuerzaMovimiento > 2.5) {
             dispararLaunchControl();
         }
@@ -150,7 +177,7 @@ function manejarGPS(posicion) {
     velocidadActual = Math.round(velocidad_ms * 3.6);
     displayVel.innerText = velocidadActual;
 
-    // 1. ESTADO DE REPOSO: Armar el semáforo
+    // 1. ESTADO DE REPOSO
     if (velocidadActual === 0) {
         if (midiendoAceleracion) abortarLaunchControl("Detención total");
         midiendoAceleracion = false;
@@ -159,58 +186,63 @@ function manejarGPS(posicion) {
         luzRoja.classList.add('rojo-on');
         textoSemaforo.innerText = "ARMADO";
         textoSemaforo.style.color = "#ff0000";
+
+        // JARVIS: Te avisa que está listo para arrancar, pero solo lo dice UNA VEZ por parada
+        if (!semaforoAnunciado) {
+            hablar("Armado");
+            semaforoAnunciado = true;
+        }
     } 
-    // 2. DISPARO POR GPS (Si el acelerómetro no lo captó)
-    else if (velocidadActual > 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
-        dispararLaunchControl();
+    // 2. MOVIMIENTO
+    else if (velocidadActual > 0) {
+        // Reiniciamos la bandera de voz porque la moto ya se movió
+        semaforoAnunciado = false; 
+
+        if (!midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
+            dispararLaunchControl();
+        }
     }
 
-    // 3. EVALUACIÓN CONSTANTE DURANTE EL JALÓN
+    // 3. EVALUACIÓN DURANTE EL JALÓN
     if (midiendoAceleracion) {
         let tiempoActual = performance.now();
         let transcurrido = ((tiempoActual - tiempoInicioLanzamiento) / 1000).toFixed(2);
 
-        // Guardamos el pico máximo de velocidad de este intento
         if (velocidadActual > maxVelocidadLanzamiento) {
             maxVelocidadLanzamiento = velocidadActual;
         }
-
-        // --- SISTEMA DE ABORTO AUTOMÁTICO ---
         
-        // Regla 1: Desaceleración (Damos un margen de 3km/h por si el GPS salta un poco, pero si baja más, abortamos)
         if (velocidadActual <= maxVelocidadLanzamiento - 3) {
             abortarLaunchControl("Pérdida de aceleración detectada");
             return; 
         }
 
-        // Regla 2: Arranque de tráfico normal (Si van 12 segs y ni siquiera pasa los 40km/h)
         if (transcurrido > 12 && velocidadActual < 40) {
             abortarLaunchControl("Aceleración insuficiente");
             return;
         }
 
-        // Regla 3: Timeout general (Si van 40 segs y no llega a 100km/h, es porque es el límite de la moto o la vía)
         if (transcurrido > 40 && !meta100Alcanzada) {
             abortarLaunchControl("Tiempo límite de pista excedido");
             return;
         }
 
-        // --- CRUCE DE METAS EXITOSAS ---
-
-        // Cruce de meta 60 km/h
+        // --- JARVIS: CANTANDO LOS TIEMPOS ---
         if (velocidadActual >= 60 && !meta60Alcanzada) {
             meta60Alcanzada = true;
             display0_60.innerText = transcurrido + "s";
             display0_60.style.color = "#00ff00";
+            // Te dice el tiempo por los audífonos
+            hablar("Sesenta en " + transcurrido + " segundos");
         }
 
-        // Cruce de meta 100 km/h
         if (velocidadActual >= 100 && !meta100Alcanzada) {
             meta100Alcanzada = true;
             display0_100.innerText = transcurrido + "s";
             display0_100.style.color = "#00ff00";
             
-            // Apagamos la medición porque ya cruzó la meta final
+            hablar("Cien kilómetros por hora alcanzados");
+            
             midiendoAceleracion = false;
             luzVerde.classList.remove('verde-on');
             textoSemaforo.innerText = "COMPLETADO";
@@ -227,6 +259,10 @@ function manejarErrorGPS(error) { displayVel.innerText = "ERR"; }
 function descargarCSV() {
     salirPantallaCompleta();
     grabando = false;
+    
+    // JARVIS: Despedida
+    hablar("Telemetría finalizada. Exportando caja negra.");
+
     window.removeEventListener('deviceorientation', manejarInclinacion);
     window.removeEventListener('devicemotion', manejarAcelerometro);
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
