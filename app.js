@@ -16,6 +16,13 @@ let maxLeanAngle = 0;
 let tiempoInicioViaje = 0;
 let gForceActual = 0;
 let ultimoRegistro = null;
+let velocidadAnteriorGPS = 0;
+let wakeLock = null;
+
+const AUTOSAVE_KEY = 'anima.telemetry.autosave.v1';
+const LAUNCH_MIN_SPEED_KMH = 8;
+const LAUNCH_MIN_DELTA_KMH = 2;
+const LAUNCH_MIN_MOTION_MS2 = 4.5;
 
 // Variables de Drag Race (Launch Control)
 let midiendoAceleracion = false;
@@ -34,6 +41,7 @@ const display0_60 = document.getElementById('display-0-60');
 const display0_100 = document.getElementById('display-0-100');
 const btnIniciar = document.getElementById('btn-iniciar');
 const btnDetener = document.getElementById('btn-detener');
+const btnStopFab = document.getElementById('btn-stop-fab');
 const statusBadge = document.getElementById('status-badge');
 const luzRoja = document.getElementById('luz-roja');
 const luzVerde = document.getElementById('luz-verde');
@@ -131,17 +139,109 @@ function salirPantallaCompleta() {
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
 }
 
+async function activarWakeLock() {
+    try {
+        if ('wakeLock' in navigator && !wakeLock) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                wakeLock = null;
+            });
+        }
+    } catch (_) {
+        // Algunos navegadores bloquean Wake Lock según contexto/gesto.
+    }
+}
+
+async function liberarWakeLock() {
+    try {
+        if (wakeLock) {
+            await wakeLock.release();
+            wakeLock = null;
+        }
+    } catch (_) {
+        wakeLock = null;
+    }
+}
+
+function guardarRespaldoLocal() {
+    try {
+        if (!registroViaje.length) return;
+
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+            savedAt: new Date().toISOString(),
+            registroViaje,
+            resumen: {
+                distanciaTotal,
+                velocidadMax,
+                maxLeanAngle,
+                tiempoInicioViaje
+            }
+        }));
+    } catch (_) {
+        // Si falla storage, no rompemos la app.
+    }
+}
+
+function limpiarRespaldoLocal() {
+    try {
+        localStorage.removeItem(AUTOSAVE_KEY);
+    } catch (_) {
+        // noop
+    }
+}
+
+function descargarCSVDesdeRegistros(registros, prefijo = 'ruta_NKD') {
+    if (!Array.isArray(registros) || !registros.length) return;
+
+    let contenidoCSV = "Tiempo,Velocidad_KMH,Inclinacion_Grados,G-Force\n";
+    registros.forEach(fila => {
+        contenidoCSV += `${fila.tiempo},${fila.velocidad_kmh},${fila.inclinacion_grados},${fila.gforce || 0}\n`;
+    });
+
+    const blob = new Blob([contenidoCSV], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = window.URL.createObjectURL(blob);
+    a.download = `${prefijo}_${new Date().getTime()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function recuperarRespaldoSiExiste() {
+    try {
+        const raw = localStorage.getItem(AUTOSAVE_KEY);
+        if (!raw) return;
+
+        const backup = JSON.parse(raw);
+        const registros = backup?.registroViaje;
+        if (!Array.isArray(registros) || !registros.length) return;
+
+        const ok = window.confirm(
+            `Encontré un viaje sin exportar (${registros.length} registros). ¿Querés descargar el rescate ahora?`
+        );
+
+        if (ok) {
+            descargarCSVDesdeRegistros(registros, 'ruta_rescate_NKD');
+            limpiarRespaldoLocal();
+        }
+    } catch (_) {
+        // noop
+    }
+}
+
 // ==========================================
 // INICIO DE TELEMETRÍA
 // ==========================================
 function iniciarTelemetria() {
     activarPantallaCompleta();
+    activarWakeLock();
     hablar("Sistemas en línea. Grabando telemetría.");
 
     btnIniciar.style.display = 'none';
     btnDetener.style.display = 'block';
     btnIniciar2.style.display = 'none';
     btnDetener2.style.display = 'block';
+    if (btnStopFab) btnStopFab.style.display = 'block';
     statusBadge.classList.add('active');
 
     // Reset métricas
@@ -153,7 +253,10 @@ function iniciarTelemetria() {
     maxLeanAngle = 0;
     gForceActual = 0;
     ultimoRegistro = null;
+    velocidadAnteriorGPS = 0;
     tiempoInicioViaje = Date.now();
+
+    limpiarRespaldoLocal();
 
     window.addEventListener('deviceorientation', manejarInclinacion);
     window.addEventListener('devicemotion', manejarAcelerometro);
@@ -179,6 +282,7 @@ function registrarDato() {
     });
 
     actualizarStats();
+    guardarRespaldoLocal();
 }
 
 function actualizarStats() {
@@ -288,7 +392,7 @@ function manejarAcelerometro(evento) {
         let accel = evento.acceleration;
         if (!accel || accel.x === null) return;
         let fuerzaMovimiento = Math.sqrt(accel.x*accel.x + accel.y*accel.y + accel.z*accel.z);
-        if (fuerzaMovimiento > 2.5) {
+        if (fuerzaMovimiento > LAUNCH_MIN_MOTION_MS2) {
             dispararLaunchControl();
         }
     }
@@ -337,7 +441,13 @@ function manejarGPS(posicion) {
     else if (velocidadActual > 0) {
         semaforoAnunciado = false;
 
-        if (!midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
+        const deltaVelocidad = velocidadActual - velocidadAnteriorGPS;
+        const salidaReal = (
+            velocidadActual >= LAUNCH_MIN_SPEED_KMH &&
+            (deltaVelocidad >= LAUNCH_MIN_DELTA_KMH || gForceActual >= 0.12)
+        );
+
+        if (!midiendoAceleracion && textoSemaforo.innerText === "ARMADO" && salidaReal) {
             dispararLaunchControl();
         }
     }
@@ -387,6 +497,8 @@ function manejarGPS(posicion) {
             textoSemaforo.style.color = "#888";
         }
     }
+
+    velocidadAnteriorGPS = velocidadActual;
 }
 
 function manejarErrorGPS(error) { displayVel.innerText = "ERR"; }
@@ -396,6 +508,7 @@ function manejarErrorGPS(error) { displayVel.innerText = "ERR"; }
 // ==========================================
 function descargarCSV() {
     salirPantallaCompleta();
+    liberarWakeLock();
     grabando = false;
 
     hablar("Telemetría finalizada. Exportando caja negra.");
@@ -409,23 +522,27 @@ function descargarCSV() {
     btnDetener.style.display = 'none';
     btnIniciar2.style.display = 'block';
     btnDetener2.style.display = 'none';
+    if (btnStopFab) btnStopFab.style.display = 'none';
     statusBadge.classList.remove('active');
 
     if (registroViaje.length === 0) return;
 
-    let contenidoCSV = "Tiempo,Velocidad_KMH,Inclinacion_Grados,G-Force\n";
-    registroViaje.forEach(fila => {
-        contenidoCSV += `${fila.tiempo},${fila.velocidad_kmh},${fila.inclinacion_grados},${fila.gforce || 0}\n`;
-    });
-
-    const blob = new Blob([contenidoCSV], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = window.URL.createObjectURL(blob);
-    a.download = `ruta_NKD_${new Date().getTime()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    descargarCSVDesdeRegistros(registroViaje);
+    limpiarRespaldoLocal();
 }
 
-// Inicializar swipe al cargar
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && grabando) {
+        activarWakeLock();
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    if (grabando) {
+        guardarRespaldoLocal();
+    }
+});
+
+// Inicialización
 setupSwipe();
+recuperarRespaldoSiExiste();
