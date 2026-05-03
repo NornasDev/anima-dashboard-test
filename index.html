@@ -7,75 +7,67 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <style>
-        /* Bloqueo absoluto de scroll y ajuste al 100% exacto de la pantalla */
         body {
             background-color: #0a0a0a; color: #00ffcc;
             font-family: 'Courier New', Courier, monospace;
-            text-align: center; margin: 0; padding: 2vh 2vw;
+            text-align: center; margin: 0; padding: 1vh 2vw;
             display: flex; flex-direction: column;
-            justify-content: space-between; 
-            height: 100vh; /* Ocupa exactamente el 100% del alto */
-            box-sizing: border-box;
-            overflow: hidden; /* Prohíbe hacer scroll */
+            height: 100vh; width: 100vw;
+            box-sizing: border-box; overflow: hidden;
         }
 
-        #estado { color: #ff3366; font-weight: bold; visibility: hidden; font-size: 0.8rem; margin-bottom: 2px;}
+        #estado { color: #ff3366; font-size: 0.7rem; height: 3vh; margin: 0; }
 
-        /* Contenedor flexible que aprieta los elementos */
         .contenedor-medidores { 
-            display: flex; flex-direction: row; flex-wrap: wrap; 
-            justify-content: center; align-content: center; gap: 5px; 
-            flex-grow: 1; /* Toma todo el espacio disponible */
+            display: flex; flex-wrap: wrap; justify-content: center; 
+            gap: 5px; flex: 1; /* Ocupa el espacio central */
         }
 
         .medidor { 
-            background: rgba(255,255,255,0.05); 
-            border-radius: 8px; padding: 5px; width: 46%;
+            background: rgba(255,255,255,0.05); border-radius: 8px;
+            width: 47%; height: 22vh; /* Alto fijo basado en la pantalla */
             display: flex; flex-direction: column; justify-content: center;
         }
 
-        /* Semáforo Launch Control - Más ancho pero más corto */
-        .semaforo-container { width: 95%; flex-direction: row; justify-content: space-around; align-items: center; border: 2px solid #444; padding: 2px;}
-        .luces { display: flex; gap: 10px; }
-        .luz { width: 25px; height: 25px; border-radius: 50%; background-color: #222; border: 2px solid #000; box-shadow: inset 0 0 10px #000; }
+        /* Semáforo ultra-compacto */
+        .semaforo-container { 
+            width: 97%; height: 12vh; flex-direction: row !important; 
+            border: 1px solid #444; padding: 0 10px;
+        }
+        .luces { display: flex; gap: 20px; }
+        .luz { width: 30px; height: 30px; border-radius: 50%; background-color: #222; }
         .luz.rojo-on { background-color: #ff0000; box-shadow: 0 0 15px #ff0000; }
         .luz.verde-on { background-color: #00ff00; box-shadow: 0 0 15px #00ff00; }
-        .texto-launch { font-size: 1.2rem; font-weight: bold; color: #888; }
 
-        .valor-gigante { font-size: 2.2rem; font-weight: bold; margin: 0; color: #ffffff; }
-        .etiqueta { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-        
-        .crono-container { border: 2px solid #ffaa00; }
-        .valor-crono { font-size: 1.8rem; color: #ffaa00; font-weight: bold; margin: 0;}
+        .valor-gigante { font-size: 2rem; font-weight: bold; color: #fff; margin: 0; }
+        .etiqueta { font-size: 0.65rem; color: #888; text-transform: uppercase; }
+        .valor-crono { font-size: 1.7rem; color: #ffaa00; font-weight: bold; }
 
-        /* Botones reducidos para no robar pantalla */
-        .panel-botones { display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%; margin-top: 5px;}
+        /* Panel de botones siempre visible */
+        .panel-botones { 
+            height: 12vh; display: flex; align-items: center; 
+            justify-content: center; gap: 10px; padding-bottom: 2vh;
+        }
         button { 
-            padding: 8px; font-size: 1rem; font-weight: bold; 
-            border: none; border-radius: 8px; text-transform: uppercase; 
-            cursor: pointer; width: 45%; 
+            height: 8vh; width: 45%; font-size: 1.1rem; 
+            font-weight: bold; border-radius: 10px; border: none;
         }
         #btn-iniciar { background-color: #00ffcc; color: #000; }
         #btn-detener { background-color: #ff3366; color: #fff; display: none; }
 
-        /* Ajustes específicos para cuando acuestes el teléfono (Motorcycle Mode) */
         @media (orientation: landscape) {
-            .semaforo-container { width: 40%; }
-            .medidor { width: 22%; }
-            .valor-gigante { font-size: 2.5rem; }
-            .valor-crono { font-size: 2rem; }
-            button { padding: 5px; } /* Botones aún más delgados en horizontal */
+            .medidor { width: 23%; height: 35vh; }
+            .semaforo-container { width: 48%; height: 35vh; flex-direction: column !important; }
+            .panel-botones { height: 15vh; }
         }
     </style>
 </head>
 <body>
-
     <div id="estado">● GRABANDO TELEMETRÍA</div>
         
     <div class="contenedor-medidores">
-        
         <div class="medidor semaforo-container">
-            <div class="texto-launch" id="texto-semaforo">STANDBY</div>
+            <div class="etiqueta" id="texto-semaforo">STANDBY</div>
             <div class="luces">
                 <div class="luz" id="luz-roja"></div>
                 <div class="luz" id="luz-verde"></div>
@@ -85,6 +77,7 @@
         <div class="medidor">
             <div class="etiqueta">Velocidad</div>
             <div class="valor-gigante" id="display-velocidad">0</div>
+            <div class="etiqueta">KM/H</div>
         </div>
 
         <div class="medidor">
@@ -107,7 +100,5 @@
         <button id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar</button>
         <button id="btn-detener" onclick="descargarCSV()">Finalizar</button>
     </div>
-
     <script src="app.js"></script>
 </body>
-</html>
