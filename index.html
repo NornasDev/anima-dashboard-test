@@ -3,52 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ánima Telemetry V4 - Launch Control</title>
+    <title>Ánima Telemetry V4 - UI Ajustada</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <style>
+        /* Bloqueo absoluto de scroll y ajuste al 100% exacto de la pantalla */
         body {
             background-color: #0a0a0a; color: #00ffcc;
             font-family: 'Courier New', Courier, monospace;
-            text-align: center; margin: 0; padding: 10px;
+            text-align: center; margin: 0; padding: 2vh 2vw;
             display: flex; flex-direction: column;
-            justify-content: space-between; height: 95vh; 
+            justify-content: space-between; 
+            height: 100vh; /* Ocupa exactamente el 100% del alto */
+            box-sizing: border-box;
+            overflow: hidden; /* Prohíbe hacer scroll */
         }
 
+        #estado { color: #ff3366; font-weight: bold; visibility: hidden; font-size: 0.8rem; margin-bottom: 2px;}
+
+        /* Contenedor flexible que aprieta los elementos */
         .contenedor-medidores { 
             display: flex; flex-direction: row; flex-wrap: wrap; 
-            justify-content: center; gap: 10px; width: 100%;
+            justify-content: center; align-content: center; gap: 5px; 
+            flex-grow: 1; /* Toma todo el espacio disponible */
         }
 
         .medidor { 
             background: rgba(255,255,255,0.05); 
-            border-radius: 10px; padding: 10px; width: 45%;
+            border-radius: 8px; padding: 5px; width: 46%;
+            display: flex; flex-direction: column; justify-content: center;
         }
 
-        /* Semáforo Launch Control */
-        .semaforo-container { width: 95%; display: flex; justify-content: space-around; align-items: center; border: 2px solid #444; }
-        .luces { display: flex; gap: 15px; }
-        .luz { width: 40px; height: 40px; border-radius: 50%; background-color: #222; border: 2px solid #000; box-shadow: inset 0 0 10px #000; }
-        .luz.rojo-on { background-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
-        .luz.verde-on { background-color: #00ff00; box-shadow: 0 0 20px #00ff00; }
-        .texto-launch { font-size: 1.5rem; font-weight: bold; color: #888; }
+        /* Semáforo Launch Control - Más ancho pero más corto */
+        .semaforo-container { width: 95%; flex-direction: row; justify-content: space-around; align-items: center; border: 2px solid #444; padding: 2px;}
+        .luces { display: flex; gap: 10px; }
+        .luz { width: 25px; height: 25px; border-radius: 50%; background-color: #222; border: 2px solid #000; box-shadow: inset 0 0 10px #000; }
+        .luz.rojo-on { background-color: #ff0000; box-shadow: 0 0 15px #ff0000; }
+        .luz.verde-on { background-color: #00ff00; box-shadow: 0 0 15px #00ff00; }
+        .texto-launch { font-size: 1.2rem; font-weight: bold; color: #888; }
 
-        .valor-gigante { font-size: 3rem; font-weight: bold; margin: 5px 0; color: #ffffff; }
-        .etiqueta { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .valor-gigante { font-size: 2.2rem; font-weight: bold; margin: 0; color: #ffffff; }
+        .etiqueta { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
         
         .crono-container { border: 2px solid #ffaa00; }
-        .valor-crono { font-size: 2rem; color: #ffaa00; font-weight: bold; margin: 5px 0;}
+        .valor-crono { font-size: 1.8rem; color: #ffaa00; font-weight: bold; margin: 0;}
 
-        .panel-botones { display: flex; flex-direction: row; gap: 10px; margin-top: 10px; justify-content: center; width: 100%;}
-        button { padding: 15px; font-size: 1.2rem; font-weight: bold; border: none; border-radius: 10px; text-transform: uppercase; cursor: pointer; width: 45%; }
+        /* Botones reducidos para no robar pantalla */
+        .panel-botones { display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%; margin-top: 5px;}
+        button { 
+            padding: 8px; font-size: 1rem; font-weight: bold; 
+            border: none; border-radius: 8px; text-transform: uppercase; 
+            cursor: pointer; width: 45%; 
+        }
         #btn-iniciar { background-color: #00ffcc; color: #000; }
         #btn-detener { background-color: #ff3366; color: #fff; display: none; }
-        #estado { color: #ff3366; font-weight: bold; visibility: hidden; margin-bottom: 5px; width: 100%;}
 
+        /* Ajustes específicos para cuando acuestes el teléfono (Motorcycle Mode) */
         @media (orientation: landscape) {
-            .medidor { width: 22%; }
             .semaforo-container { width: 40%; }
-            .crono-container { width: 25%; }
+            .medidor { width: 22%; }
+            .valor-gigante { font-size: 2.5rem; }
+            .valor-crono { font-size: 2rem; }
+            button { padding: 5px; } /* Botones aún más delgados en horizontal */
         }
     </style>
 </head>
@@ -77,12 +93,12 @@
         </div>
 
         <div class="medidor crono-container">
-            <div class="etiqueta">0 - 60 KM/H</div>
+            <div class="etiqueta">0-60 KM/H</div>
             <div class="valor-crono" id="display-0-60">-- s</div>
         </div>
 
         <div class="medidor crono-container">
-            <div class="etiqueta">0 - 100 KM/H</div>
+            <div class="etiqueta">0-100 KM/H</div>
             <div class="valor-crono" id="display-0-100">-- s</div>
         </div>
     </div>
