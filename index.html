@@ -2,103 +2,574 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ánima Telemetry V4 - UI Ajustada</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Ánima V4 - Top Control</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0a0a0a">
     <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-card: rgba(255,255,255,0.04);
+            --accent-cyan: #00ffcc;
+            --accent-orange: #ffaa00;
+            --accent-red: #ff3366;
+            --accent-green: #00ff00;
+            --accent-purple: #a855f7;
+            --text-primary: #ffffff;
+            --text-secondary: #666;
+            --glass-border: rgba(255,255,255,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background-color: #0a0a0a; color: #00ffcc;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: center; margin: 0; padding: 1vh 2vw;
-            display: flex; flex-direction: column;
-            height: 100vh; width: 100vw;
-            box-sizing: border-box; overflow: hidden;
+            background-color: var(--bg-primary);
+            color: var(--accent-cyan);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px);
+            gap: 8px;
+            touch-action: pan-y;
         }
 
-        #estado { color: #ff3366; font-size: 0.7rem; height: 3vh; margin: 0; }
-
-        .contenedor-medidores { 
-            display: flex; flex-wrap: wrap; justify-content: center; 
-            gap: 5px; flex: 1; /* Ocupa el espacio central */
+        /* Page Container */
+        .pages {
+            flex: 1;
+            display: flex;
+            transition: transform 0.3s ease;
+            overflow: hidden;
         }
 
-        .medidor { 
-            background: rgba(255,255,255,0.05); border-radius: 8px;
-            width: 47%; height: 22vh; /* Alto fijo basado en la pantalla */
-            display: flex; flex-direction: column; justify-content: center;
+        .page {
+            min-width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        /* Semáforo ultra-compacto */
-        .semaforo-container { 
-            width: 97%; height: 12vh; flex-direction: row !important; 
-            border: 1px solid #444; padding: 0 10px;
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
         }
-        .luces { display: flex; gap: 20px; }
-        .luz { width: 30px; height: 30px; border-radius: 50%; background-color: #222; }
-        .luz.rojo-on { background-color: #ff0000; box-shadow: 0 0 15px #ff0000; }
-        .luz.verde-on { background-color: #00ff00; box-shadow: 0 0 15px #00ff00; }
 
-        .valor-gigante { font-size: 2rem; font-weight: bold; color: #fff; margin: 0; }
-        .etiqueta { font-size: 0.65rem; color: #888; text-transform: uppercase; }
-        .valor-crono { font-size: 1.7rem; color: #ffaa00; font-weight: bold; }
-
-        /* Panel de botones siempre visible */
-        .panel-botones { 
-            height: 12vh; display: flex; align-items: center; 
-            justify-content: center; gap: 10px; padding-bottom: 2vh;
+        .logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--text-primary);
         }
-        button { 
-            height: 8vh; width: 45%; font-size: 1.1rem; 
-            font-weight: bold; border-radius: 10px; border: none;
-        }
-        #btn-iniciar { background-color: #00ffcc; color: #000; }
-        #btn-detener { background-color: #ff3366; color: #fff; display: none; }
 
+        .page-indicator {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .dot.active {
+            background: var(--accent-cyan);
+            width: 18px;
+            border-radius: 3px;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255,51,102,0.15);
+            color: var(--accent-red);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .status-badge.active {
+            opacity: 1;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Main Grid */
+        .dashboard {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1.5fr 1fr 1fr;
+            gap: 8px;
+            min-height: 0;
+        }
+
+        /* Speedometer - Hero */
+        .speedometer {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(0,255,204,0.08) 0%, rgba(0,255,204,0.02) 100%);
+            border: 1px solid rgba(0,255,204,0.2);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .speedometer::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,255,204,0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .speed-value {
+            font-size: 5.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1;
+            text-shadow: 0 0 30px rgba(0,255,204,0.4);
+        }
+
+        .speed-unit {
+            font-size: 1.2rem;
+            color: var(--accent-cyan);
+            font-weight: 500;
+            letter-spacing: 3px;
+            margin-top: 4px;
+        }
+
+        .speed-ring {
+            position: absolute;
+            bottom: 20px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 8px;
+        }
+
+        .card-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-value.orange {
+            color: var(--accent-orange);
+        }
+
+        .card-value.purple {
+            color: var(--accent-purple);
+        }
+
+        .card-value.cyan {
+            color: var(--accent-cyan);
+        }
+
+        .card-value.green {
+            color: var(--accent-green);
+        }
+
+        .card-unit {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Timer cards */
+        .timer-card {
+            background: linear-gradient(135deg, rgba(255,170,0,0.08) 0%, rgba(255,170,0,0.02) 100%);
+            border-color: rgba(255,170,0,0.15);
+        }
+
+        /* Status light */
+        .status-card {
+            flex-direction: row;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .status-light {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #222;
+            transition: all 0.3s;
+        }
+
+        .status-light.red.active {
+            background: var(--accent-red);
+            box-shadow: 0 0 20px var(--accent-red);
+        }
+
+        .status-light.green.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 20px var(--accent-green);
+        }
+
+        .status-text {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            padding: 8px 0;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, #00ccaa 100%);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(0,255,204,0.3);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, var(--accent-red) 0%, #cc2244 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(255,51,102,0.3);
+            display: none;
+        }
+
+        /* Page 2 - Stats Grid */
+        .stats-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            min-height: 0;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 12px;
+        }
+
+        .stat-card.highlight {
+            background: linear-gradient(135deg, rgba(168,85,247,0.1) 0%, rgba(168,85,247,0.02) 100%);
+            border-color: rgba(168,85,247,0.2);
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-value.large {
+            font-size: 2.4rem;
+        }
+
+        .stat-unit {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        /* Swipe hint */
+        .swipe-hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            opacity: 0.5;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .swipe-hint svg {
+            width: 16px;
+            height: 16px;
+            animation: swipeAnim 2s infinite;
+        }
+
+        @keyframes swipeAnim {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(10px); }
+        }
+
+        /* Landscape */
         @media (orientation: landscape) {
-            .medidor { width: 23%; height: 35vh; }
-            .semaforo-container { width: 48%; height: 35vh; flex-direction: column !important; }
-            .panel-botones { height: 15vh; }
+            .dashboard {
+                grid-template-columns: 2fr 1fr 1fr 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+
+            .speedometer {
+                grid-row: 1 / -1;
+                grid-column: 1;
+            }
+
+            .status-card {
+                grid-column: 2;
+                grid-row: 1;
+            }
+
+            .card:nth-child(3) {
+                grid-column: 2;
+                grid-row: 2;
+            }
+
+            .card:nth-child(4) {
+                grid-column: 3;
+                grid-row: 1 / -1;
+            }
+
+            .card:nth-child(5) {
+                grid-column: 4;
+                grid-row: 1 / -1;
+            }
+
+            .speed-value {
+                font-size: 6rem;
+            }
+
+            /* Stats grid landscape */
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                grid-template-rows: 1fr 1fr;
+            }
+
+            .stat-card:nth-child(1) { grid-column: 1; grid-row: 1 / -1; }
+            .stat-card:nth-child(2) { grid-column: 2; grid-row: 1 / -1; }
+            .stat-card:nth-child(3) { grid-column: 3; grid-row: 1; }
+            .stat-card:nth-child(4) { grid-column: 4; grid-row: 1; }
+            .stat-card:nth-child(5) { grid-column: 3; grid-row: 2; }
+            .stat-card:nth-child(6) { grid-column: 4; grid-row: 2; }
+        }
+
+        /* Safe area for modern phones */
+        @supports (padding: env(safe-area-inset-top)) {
+            .header {
+                padding-top: max(8px, env(safe-area-inset-top));
+            }
+            .controls {
+                padding-bottom: max(8px, env(safe-area-inset-bottom));
+            }
         }
     </style>
 </head>
 <body>
-    <div id="estado">● GRABANDO TELEMETRÍA</div>
-        
-    <div class="contenedor-medidores">
-        <div class="medidor semaforo-container">
-            <div class="etiqueta" id="texto-semaforo">STANDBY</div>
-            <div class="luces">
-                <div class="luz" id="luz-roja"></div>
-                <div class="luz" id="luz-verde"></div>
+    <div class="header">
+        <div class="logo">ÁNIMA</div>
+        <div class="page-indicator">
+            <div class="dot active" id="dot-0"></div>
+            <div class="dot" id="dot-1"></div>
+        </div>
+        <div class="status-badge" id="status-badge">
+            <span>GRABANDO</span>
+        </div>
+    </div>
+
+    <div class="pages" id="pages">
+        <!-- Page 1: Main Dashboard -->
+        <div class="page" id="page-0">
+            <div class="dashboard">
+                <!-- Speedometer (Hero) -->
+                <div class="speedometer">
+                    <div class="speed-value" id="display-velocidad">0</div>
+                    <div class="speed-unit">KM/H</div>
+                    <div class="speed-ring">VELOCIDAD</div>
+                </div>
+
+                <!-- Status -->
+                <div class="card status-card">
+                    <div class="status-light red" id="luz-roja"></div>
+                    <div class="status-light green" id="luz-verde"></div>
+                    <div class="status-text" id="texto-semaforo">STANDBY</div>
+                </div>
+
+                <!-- Roll -->
+                <div class="card">
+                    <div class="card-label">Roll</div>
+                    <div class="card-value" id="display-angulo">0°</div>
+                </div>
+
+                <!-- 0-60 -->
+                <div class="card timer-card">
+                    <div class="card-label">0-60</div>
+                    <div class="card-value orange" id="display-0-60">--</div>
+                    <div class="card-unit">seg</div>
+                </div>
+
+                <!-- 0-100 -->
+                <div class="card timer-card">
+                    <div class="card-label">0-100</div>
+                    <div class="card-value orange" id="display-0-100">--</div>
+                    <div class="card-unit">seg</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-start" id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar</button>
+                <button class="btn btn-stop" id="btn-detener" onclick="descargarCSV()">Finalizar</button>
             </div>
         </div>
 
-        <div class="medidor">
-            <div class="etiqueta">Velocidad</div>
-            <div class="valor-gigante" id="display-velocidad">0</div>
-            <div class="etiqueta">KM/H</div>
-        </div>
+        <!-- Page 2: Stats -->
+        <div class="page" id="page-1">
+            <div class="stats-grid">
+                <!-- Distance -->
+                <div class="stat-card highlight">
+                    <div class="stat-icon">📍</div>
+                    <div class="stat-label">Distancia</div>
+                    <div class="stat-value large" id="stat-distancia">0.00</div>
+                    <div class="stat-unit">km</div>
+                </div>
 
-        <div class="medidor">
-            <div class="etiqueta">Inclinación</div>
-            <div class="valor-gigante" id="display-angulo">0°</div>
-        </div>
+                <!-- Max Speed -->
+                <div class="stat-card">
+                    <div class="stat-icon">🚀</div>
+                    <div class="stat-label">Vel. Máx</div>
+                    <div class="stat-value cyan" id="stat-vel-max">0</div>
+                    <div class="stat-unit">km/h</div>
+                </div>
 
-        <div class="medidor crono-container">
-            <div class="etiqueta">0-60 KM/H</div>
-            <div class="valor-crono" id="display-0-60">-- s</div>
-        </div>
+                <!-- G-Force -->
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-label">G-Force</div>
+                    <div class="stat-value purple" id="stat-gforce">0.0</div>
+                    <div class="stat-unit">G</div>
+                </div>
 
-        <div class="medidor crono-container">
-            <div class="etiqueta">0-100 KM/H</div>
-            <div class="valor-crono" id="display-0-100">-- s</div>
+                <!-- Max Lean -->
+                <div class="stat-card">
+                    <div class="stat-icon">🏁</div>
+                    <div class="stat-label">Lean Máx</div>
+                    <div class="stat-value green" id="stat-lean-max">0°</div>
+                    <div class="stat-unit">degrees</div>
+                </div>
+
+                <!-- Avg Speed -->
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-label">Vel. Prom</div>
+                    <div class="stat-value" id="stat-vel-prom">0</div>
+                    <div class="stat-unit">km/h</div>
+                </div>
+
+                <!-- Trip Time -->
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-label">Tiempo</div>
+                    <div class="stat-value" id="stat-tiempo">00:00</div>
+                    <div class="stat-unit">hh:mm</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-start" id="btn-iniciar-2" onclick="iniciarTelemetria()">Iniciar</button>
+                <button class="btn btn-stop" id="btn-detener-2" onclick="descargarCSV()">Finalizar</button>
+            </div>
+
+            <div class="swipe-hint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 4h6v6M20 4L10 14M14 20h-6v-6"/>
+                </svg>
+                Deslizá para volver
+            </div>
         </div>
     </div>
 
-    <div class="panel-botones">
-        <button id="btn-iniciar" onclick="iniciarTelemetria()">Iniciar</button>
-        <button id="btn-detener" onclick="descargarCSV()">Finalizar</button>
-    </div>
     <script src="app.js"></script>
 </body>
+</html>
