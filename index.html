@@ -36,7 +36,7 @@
             flex-direction: column;
             padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px);
             gap: 8px;
-            touch-action: pan-y;
+            touch-action: manipulation;
         }
 
         /* Page Container */
@@ -71,6 +71,23 @@
             font-weight: 700;
             letter-spacing: 2px;
             color: var(--text-primary);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-page-btn {
+            border: 1px solid var(--glass-border);
+            background: rgba(255,255,255,0.05);
+            color: var(--accent-cyan);
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
 
         .page-indicator {
@@ -449,7 +466,10 @@
 </head>
 <body>
     <div class="header">
-        <div class="logo">ÁNIMA</div>
+        <div class="header-left">
+            <div class="logo">ÁNIMA</div>
+            <button id="btn-toggle-page" class="nav-page-btn" onclick="togglePage()">Métricas</button>
+        </div>
         <div class="page-indicator">
             <div class="dot active" id="dot-0"></div>
             <div class="dot" id="dot-1"></div>

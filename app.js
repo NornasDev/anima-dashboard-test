@@ -53,6 +53,7 @@ const statTiempo = document.getElementById('stat-tiempo');
 const pagesContainer = document.getElementById('pages');
 const dot0 = document.getElementById('dot-0');
 const dot1 = document.getElementById('dot-1');
+const btnTogglePage = document.getElementById('btn-toggle-page');
 
 let currentPage = 0;
 let touchStartX = 0;
@@ -62,12 +63,12 @@ let touchEndX = 0;
 // NAVEGACIÓN POR SWIPE
 // ==========================================
 function setupSwipe() {
-    document.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
+    pagesContainer.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].clientX;
     }, { passive: true });
 
-    document.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
+    pagesContainer.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].clientX;
         handleSwipe();
     }, { passive: true });
 }
@@ -92,6 +93,14 @@ function goToPage(pageNum) {
     // Update dots
     dot0.classList.toggle('active', pageNum === 0);
     dot1.classList.toggle('active', pageNum === 1);
+
+    if (btnTogglePage) {
+        btnTogglePage.innerText = pageNum === 0 ? 'Métricas' : 'Velocímetro';
+    }
+}
+
+function togglePage() {
+    goToPage(currentPage === 0 ? 1 : 0);
 }
 
 // ==========================================
