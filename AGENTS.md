@@ -53,3 +53,50 @@ Para evitar un sistema monolítico, dividiremos la inteligencia en "Agentes" que
 - **Intercomunicación de Flota:** Si otro amigo usa Ánima, los Jarvis se comunican entre sí: "Tu compañero de ruta está 500 metros atrás y ha bajado el ritmo".
 - **Modo Reconocimiento de Terreno:** Usar la API de mapas para predecir curvas: "Curva cerrada a la derecha en 200 metros, reduce velocidad".
 - **Gamificación de Conducción:** Puntuación de eficiencia y seguridad (Estilo 'Eco-Score' o 'Safety-Score').
+
+---
+
+## 4. Estado Actual del Proyecto (Mayo 2026)
+
+### Implementado en la app web móvil
+- Dashboard principal con prioridad de velocidad + pantalla secundaria de métricas.
+- Navegación entre pantallas por botón (`Métricas/Velocímetro`) y swipe.
+- Captura de sensores:
+  - GPS (latitud, longitud, velocidad, precisión, altitud, heading).
+  - Device orientation (roll, beta, gamma, orientación de pantalla).
+  - Device motion (aceleración lineal, aceleración con gravedad, G-force).
+- Cronómetros de performance:
+  - 0-60 km/h
+  - 0-100 km/h
+  - Launch control con umbrales reforzados para reducir falsos positivos.
+- Seguridad operativa en ruta:
+  - Botón flotante de emergencia **Detener viaje**.
+  - Wake Lock para evitar apagado de pantalla mientras se graba.
+  - Respaldo local automático por tick + recuperación tras recarga inesperada.
+- Exportación completa de telemetría a CSV (snapshot por segundo).
+- Envío de viaje a servidor vía POST JSON (endpoint configurable desde la UI).
+
+### Brechas actuales
+- Validación final en dispositivos reales (Chrome Android / Safari iOS) bajo vibración y luz exterior.
+- Falta backend oficial del proyecto para ingesta, validación y almacenamiento persistente.
+
+## 5. Roadmap Actualizado (Próximos pasos)
+
+### Fase 1 (corto plazo): Estabilización de campo
+- Pruebas instrumentadas en ruta real y ajuste de umbrales de launch por tipo de moto.
+- Telemetría de salud de sesión (eventos de error, permisos, pérdidas de GPS).
+- UI de diagnóstico rápido (estado de sensores y permisos en tiempo real).
+
+### Fase 2: Ingesta y almacenamiento central
+- Backend de ingesta (`/api/telemetria`) con autenticación básica.
+- Persistencia en base temporal (InfluxDB/Timescale) y retención configurable.
+- Reintentos offline + cola local de sincronización.
+
+### Fase 3: Inteligencia y análisis
+- Métricas derivadas avanzadas (score de conducción, eventos de riesgo, curvas).
+- Módulo acústico (RPM por FFT) para diagnóstico no invasivo.
+- Primer loop de recomendaciones automáticas post-viaje.
+
+### Fase 4: Jarvis conversacional
+- Integración LLM con contexto de los últimos segundos + historial de viajes.
+- Respuestas de coaching en lenguaje natural y comparativa entre sesiones.

@@ -40,9 +40,9 @@ let wakeLock = null;
 
 const AUTOSAVE_KEY = 'anima.telemetry.autosave.v1';
 const SERVER_URL_KEY = 'anima.telemetry.server-url.v1';
-const LAUNCH_MIN_SPEED_KMH = 8;
-const LAUNCH_MIN_DELTA_KMH = 2;
-const LAUNCH_MIN_MOTION_MS2 = 4.5;
+const LAUNCH_MIN_SPEED_KMH = 15;
+const LAUNCH_MIN_DELTA_KMH = 4;
+const LAUNCH_MIN_MOTION_MS2 = 6.5;
 
 // Variables de Drag Race (Launch Control)
 let midiendoAceleracion = false;
@@ -80,6 +80,8 @@ const statTiempo = document.getElementById('stat-tiempo');
 
 // Referencias de navegación
 const pagesContainer = document.getElementById('pages');
+const page0 = document.getElementById('page-0');
+const page1 = document.getElementById('page-1');
 const dot0 = document.getElementById('dot-0');
 const dot1 = document.getElementById('dot-1');
 const btnTogglePage = document.getElementById('btn-toggle-page');
@@ -87,11 +89,39 @@ const btnTogglePage = document.getElementById('btn-toggle-page');
 let currentPage = 0;
 let touchStartX = 0;
 let touchEndX = 0;
+let launchConfidenceTicks = 0;
+
+function setText(el, value) {
+    if (!el) return;
+    el.innerText = value;
+}
+
+function setDisplay(el, value) {
+    if (!el) return;
+    el.style.display = value;
+}
+
+function addClass(el, className) {
+    if (!el?.classList) return;
+    el.classList.add(className);
+}
+
+function removeClass(el, className) {
+    if (!el?.classList) return;
+    el.classList.remove(className);
+}
+
+function toggleClass(el, className, force) {
+    if (!el?.classList) return;
+    el.classList.toggle(className, force);
+}
 
 // ==========================================
 // NAVEGACIÓN POR SWIPE
 // ==========================================
 function setupSwipe() {
+    if (!pagesContainer) return;
+
     pagesContainer.addEventListener('touchstart', e => {
         touchStartX = e.changedTouches[0].clientX;
     }, { passive: true });
@@ -116,15 +146,17 @@ function handleSwipe() {
 }
 
 function goToPage(pageNum) {
-    currentPage = pageNum;
-    pagesContainer.style.transform = `translateX(-${pageNum * 100}%)`;
+    currentPage = pageNum === 1 ? 1 : 0;
+
+    toggleClass(page0, 'active', currentPage === 0);
+    toggleClass(page1, 'active', currentPage === 1);
 
     // Update dots
-    dot0.classList.toggle('active', pageNum === 0);
-    dot1.classList.toggle('active', pageNum === 1);
+    toggleClass(dot0, 'active', currentPage === 0);
+    toggleClass(dot1, 'active', currentPage === 1);
 
     if (btnTogglePage) {
-        btnTogglePage.innerText = pageNum === 0 ? 'Métricas' : 'Velocímetro';
+        btnTogglePage.innerText = currentPage === 0 ? 'Métricas' : 'Velocímetro';
     }
 }
 
@@ -398,12 +430,12 @@ function iniciarTelemetria() {
     activarWakeLock();
     hablar("Sistemas en línea. Grabando telemetría.");
 
-    btnIniciar.style.display = 'none';
-    btnDetener.style.display = 'block';
-    btnIniciar2.style.display = 'none';
-    btnDetener2.style.display = 'block';
-    if (btnStopFab) btnStopFab.style.display = 'block';
-    statusBadge.classList.add('active');
+    setDisplay(btnIniciar, 'none');
+    setDisplay(btnDetener, 'block');
+    setDisplay(btnIniciar2, 'none');
+    setDisplay(btnDetener2, 'block');
+    setDisplay(btnStopFab, 'block');
+    addClass(statusBadge, 'active');
 
     // Reset métricas
     grabando = true;
@@ -432,6 +464,7 @@ function iniciarTelemetria() {
     accelGZ = 0;
     tiempo060 = null;
     tiempo0100 = null;
+    launchConfidenceTicks = 0;
     tiempoInicioViaje = Date.now();
 
     limpiarRespaldoLocal();
@@ -515,12 +548,12 @@ function actualizarStats() {
     let tiempoStr = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
 
     // Actualizar UI
-    statDistancia.innerText = distanciaTotal.toFixed(2);
-    statVelMax.innerText = velocidadMax;
-    statGForce.innerText = gForceActual.toFixed(1);
-    statLeanMax.innerText = Math.round(Math.abs(maxLeanAngle)) + "°";
-    statVelProm.innerText = velProm;
-    statTiempo.innerText = tiempoStr;
+    setText(statDistancia, distanciaTotal.toFixed(2));
+    setText(statVelMax, velocidadMax);
+    setText(statGForce, gForceActual.toFixed(1));
+    setText(statLeanMax, Math.round(Math.abs(maxLeanAngle)) + "°");
+    setText(statVelProm, velProm);
+    setText(statTiempo, tiempoStr);
 }
 
 // ==========================================
@@ -535,15 +568,15 @@ function dispararLaunchControl() {
 
     hablar("¡Vamos!");
 
-    luzRoja.classList.remove('active');
-    luzVerde.classList.add('active');
-    textoSemaforo.innerText = "¡LAUNCH!";
-    textoSemaforo.style.color = "#00ff00";
+    removeClass(luzRoja, 'active');
+    addClass(luzVerde, 'active');
+    setText(textoSemaforo, "¡LAUNCH!");
+    if (textoSemaforo) textoSemaforo.style.color = "#00ff00";
 
-    display0_60.innerText = "Midiendo...";
-    display0_100.innerText = "Midiendo...";
-    display0_60.style.color = "#ffaa00";
-    display0_100.style.color = "#ffaa00";
+    setText(display0_60, "Midiendo...");
+    setText(display0_100, "Midiendo...");
+    if (display0_60) display0_60.style.color = "#ffaa00";
+    if (display0_100) display0_100.style.color = "#ffaa00";
 }
 
 function abortarLaunchControl(motivo) {
@@ -555,17 +588,17 @@ function abortarLaunchControl(motivo) {
         hablar("Tiempo excedido");
     }
 
-    luzVerde.classList.remove('active');
-    textoSemaforo.innerText = "ABORTO";
-    textoSemaforo.style.color = "#ff3366";
+    removeClass(luzVerde, 'active');
+    setText(textoSemaforo, "ABORTO");
+    if (textoSemaforo) textoSemaforo.style.color = "#ff3366";
 
     if (!meta60Alcanzada) {
-        display0_60.innerText = "-- s";
-        display0_60.style.color = "#ffaa00";
+        setText(display0_60, "-- s");
+        if (display0_60) display0_60.style.color = "#ffaa00";
     }
     if (!meta100Alcanzada) {
-        display0_100.innerText = "-- s";
-        display0_100.style.color = "#ffaa00";
+        setText(display0_100, "-- s");
+        if (display0_100) display0_100.style.color = "#ffaa00";
     }
 }
 
@@ -597,7 +630,7 @@ function manejarAcelerometro(evento) {
 
     // Launch control por movimiento
     if (!grabando) return;
-    if (velocidadActual === 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
+    if (velocidadActual === 0 && !midiendoAceleracion && textoSemaforo?.innerText === "ARMADO") {
         if (!accelLineal || accelLineal.x === null) return;
         let fuerzaMovimiento = Math.sqrt(accelLineal.x*accelLineal.x + accelLineal.y*accelLineal.y + accelLineal.z*accelLineal.z);
         if (fuerzaMovimiento > LAUNCH_MIN_MOTION_MS2) {
@@ -619,7 +652,7 @@ function manejarInclinacion(evento) {
     let roll = (orientacion === 90 || orientacion === -90) ? evento.beta : evento.gamma;
     if (roll !== null) {
         inclinacionActual = Math.round(roll);
-        displayAngulo.innerText = inclinacionActual + "°";
+        setText(displayAngulo, inclinacionActual + "°");
     }
 }
 
@@ -639,17 +672,18 @@ function manejarGPS(posicion) {
     if (velocidad_ms === null || velocidad_ms < 0) velocidad_ms = 0;
     velocidadMsActual = Number(velocidad_ms);
     velocidadActual = Math.round(velocidad_ms * 3.6);
-    displayVel.innerText = velocidadActual;
+    setText(displayVel, velocidadActual);
 
     // Estado de reposo
     if (velocidadActual === 0) {
         if (midiendoAceleracion) abortarLaunchControl("Detención total");
         midiendoAceleracion = false;
 
-        luzVerde.classList.remove('active');
-        luzRoja.classList.add('active');
-        textoSemaforo.innerText = "ARMADO";
-        textoSemaforo.style.color = "#ff0000";
+        removeClass(luzVerde, 'active');
+        addClass(luzRoja, 'active');
+        setText(textoSemaforo, "ARMADO");
+        if (textoSemaforo) textoSemaforo.style.color = "#ff0000";
+        launchConfidenceTicks = 0;
 
         if (!semaforoAnunciado) {
             hablar("Armado");
@@ -663,10 +697,13 @@ function manejarGPS(posicion) {
         const deltaVelocidad = velocidadActual - velocidadAnteriorGPS;
         const salidaReal = (
             velocidadActual >= LAUNCH_MIN_SPEED_KMH &&
-            (deltaVelocidad >= LAUNCH_MIN_DELTA_KMH || gForceActual >= 0.12)
+            (deltaVelocidad >= LAUNCH_MIN_DELTA_KMH || gForceActual >= 0.2)
         );
 
-        if (!midiendoAceleracion && textoSemaforo.innerText === "ARMADO" && salidaReal) {
+        launchConfidenceTicks = salidaReal ? launchConfidenceTicks + 1 : 0;
+        const lanzamientoConfirmado = launchConfidenceTicks >= 2;
+
+        if (!midiendoAceleracion && textoSemaforo?.innerText === "ARMADO" && lanzamientoConfirmado) {
             dispararLaunchControl();
         }
     }
@@ -699,30 +736,30 @@ function manejarGPS(posicion) {
         if (velocidadActual >= 60 && !meta60Alcanzada) {
             meta60Alcanzada = true;
             tiempo060 = Number(transcurrido);
-            display0_60.innerText = transcurrido + "s";
-            display0_60.style.color = "#00ff00";
+            setText(display0_60, transcurrido + "s");
+            if (display0_60) display0_60.style.color = "#00ff00";
             hablar("Sesenta en " + transcurrido + " segundos");
         }
 
         if (velocidadActual >= 100 && !meta100Alcanzada) {
             meta100Alcanzada = true;
             tiempo0100 = Number(transcurrido);
-            display0_100.innerText = transcurrido + "s";
-            display0_100.style.color = "#00ff00";
+            setText(display0_100, transcurrido + "s");
+            if (display0_100) display0_100.style.color = "#00ff00";
 
             hablar("Cien kilómetros por hora alcanzados");
 
             midiendoAceleracion = false;
-            luzVerde.classList.remove('active');
-            textoSemaforo.innerText = "COMPLETADO";
-            textoSemaforo.style.color = "#888";
+            removeClass(luzVerde, 'active');
+            setText(textoSemaforo, "COMPLETADO");
+            if (textoSemaforo) textoSemaforo.style.color = "#888";
         }
     }
 
     velocidadAnteriorGPS = velocidadActual;
 }
 
-function manejarErrorGPS(error) { displayVel.innerText = "ERR"; }
+function manejarErrorGPS(error) { setText(displayVel, "ERR"); }
 
 // ==========================================
 // EXPORTACIÓN DE DATOS
@@ -739,12 +776,12 @@ function descargarCSV() {
     if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
     clearInterval(intervaloGrabacion);
 
-    btnIniciar.style.display = 'block';
-    btnDetener.style.display = 'none';
-    btnIniciar2.style.display = 'block';
-    btnDetener2.style.display = 'none';
-    if (btnStopFab) btnStopFab.style.display = 'none';
-    statusBadge.classList.remove('active');
+    setDisplay(btnIniciar, 'block');
+    setDisplay(btnDetener, 'none');
+    setDisplay(btnIniciar2, 'block');
+    setDisplay(btnDetener2, 'none');
+    setDisplay(btnStopFab, 'none');
+    removeClass(statusBadge, 'active');
 
     if (registroViaje.length === 0) return;
 
@@ -764,6 +801,16 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+window.addEventListener('error', () => {
+    // Fail-safe: mantener control de parada visible si algo rompe en runtime.
+    if (grabando) setDisplay(btnStopFab, 'block');
+});
+
+window.addEventListener('unhandledrejection', () => {
+    if (grabando) setDisplay(btnStopFab, 'block');
+});
+
 // Inicialización
 setupSwipe();
+goToPage(0);
 recuperarRespaldoSiExiste();
