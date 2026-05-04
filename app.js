@@ -8,6 +8,25 @@ let intervaloGrabacion = null;
 
 let velocidadActual = 0;
 let inclinacionActual = 0;
+let velocidadMsActual = 0;
+let latitudActual = null;
+let longitudActual = null;
+let precisionGpsActual = null;
+let altitudActual = null;
+let headingActual = null;
+
+let orientacionPantalla = 0;
+let betaActual = null;
+let gammaActual = null;
+
+let accelX = 0;
+let accelY = 0;
+let accelZ = 0;
+let accelGX = 0;
+let accelGY = 0;
+let accelGZ = 0;
+let tiempo060 = null;
+let tiempo0100 = null;
 
 // Variables de métricas adicionales
 let distanciaTotal = 0; // km
@@ -20,6 +39,7 @@ let velocidadAnteriorGPS = 0;
 let wakeLock = null;
 
 const AUTOSAVE_KEY = 'anima.telemetry.autosave.v1';
+const SERVER_URL_KEY = 'anima.telemetry.server-url.v1';
 const LAUNCH_MIN_SPEED_KMH = 8;
 const LAUNCH_MIN_DELTA_KMH = 2;
 const LAUNCH_MIN_MOTION_MS2 = 4.5;
@@ -50,6 +70,7 @@ const textoSemaforo = document.getElementById('texto-semaforo');
 // Referencias HTML - Page 2 (Stats)
 const btnIniciar2 = document.getElementById('btn-iniciar-2');
 const btnDetener2 = document.getElementById('btn-detener-2');
+const btnEnviarServidor = document.getElementById('btn-enviar-servidor');
 const statDistancia = document.getElementById('stat-distancia');
 const statVelMax = document.getElementById('stat-vel-max');
 const statGForce = document.getElementById('stat-gforce');
@@ -109,6 +130,22 @@ function goToPage(pageNum) {
 
 function togglePage() {
     goToPage(currentPage === 0 ? 1 : 0);
+}
+
+function getServerUrl() {
+    try {
+        return localStorage.getItem(SERVER_URL_KEY) || '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function setServerUrl(url) {
+    try {
+        localStorage.setItem(SERVER_URL_KEY, url);
+    } catch (_) {
+        // noop
+    }
 }
 
 // ==========================================
@@ -193,9 +230,58 @@ function limpiarRespaldoLocal() {
 function descargarCSVDesdeRegistros(registros, prefijo = 'ruta_NKD') {
     if (!Array.isArray(registros) || !registros.length) return;
 
-    let contenidoCSV = "Tiempo,Velocidad_KMH,Inclinacion_Grados,G-Force\n";
+    let contenidoCSV = [
+        "Tiempo",
+        "Latitud",
+        "Longitud",
+        "Precision_GPS_M",
+        "Altitud_M",
+        "Heading_Deg",
+        "Velocidad_MS",
+        "Velocidad_KMH",
+        "Orientacion_Pantalla_Deg",
+        "Beta",
+        "Gamma",
+        "Inclinacion_Grados",
+        "Accel_X_MS2",
+        "Accel_Y_MS2",
+        "Accel_Z_MS2",
+        "Accel_GX_MS2",
+        "Accel_GY_MS2",
+        "Accel_GZ_MS2",
+        "G_Force",
+        "Estado_Semaforo",
+        "Midiendo_Lanzamiento",
+        "Tiempo_0_60_S",
+        "Tiempo_0_100_S"
+    ].join(',') + "\n";
+
     registros.forEach(fila => {
-        contenidoCSV += `${fila.tiempo},${fila.velocidad_kmh},${fila.inclinacion_grados},${fila.gforce || 0}\n`;
+        contenidoCSV += [
+            fila.tiempo,
+            fila.latitud,
+            fila.longitud,
+            fila.precision_gps_m,
+            fila.altitud_m,
+            fila.heading_deg,
+            fila.velocidad_ms,
+            fila.velocidad_kmh,
+            fila.orientacion_pantalla_deg,
+            fila.beta,
+            fila.gamma,
+            fila.inclinacion_grados,
+            fila.accel_x_ms2,
+            fila.accel_y_ms2,
+            fila.accel_z_ms2,
+            fila.accel_gx_ms2,
+            fila.accel_gy_ms2,
+            fila.accel_gz_ms2,
+            fila.gforce,
+            `"${String(fila.estado_semaforo || '').replace(/"/g, '""')}"`,
+            fila.midiendo_lanzamiento,
+            fila.tiempo_0_60_s,
+            fila.tiempo_0_100_s
+        ].join(',') + "\n";
     });
 
     const blob = new Blob([contenidoCSV], { type: 'text/csv' });
@@ -229,6 +315,81 @@ function recuperarRespaldoSiExiste() {
     }
 }
 
+function construirPayloadViaje() {
+    const tiempoFin = new Date().toISOString();
+    const tiempoInicioISO = tiempoInicioViaje ? new Date(tiempoInicioViaje).toISOString() : null;
+
+    return {
+        source: 'anima-dashboard-test',
+        created_at: new Date().toISOString(),
+        trip: {
+            started_at: tiempoInicioISO,
+            ended_at: tiempoFin,
+            duration_ms: tiempoInicioViaje ? Date.now() - tiempoInicioViaje : null,
+            summary: {
+                distancia_km: Number(distanciaTotal.toFixed(3)),
+                velocidad_max_kmh: velocidadMax,
+                velocidad_promedio_kmh: registroViaje.length
+                    ? Math.round(registroViaje.reduce((acc, r) => acc + (r.velocidad_kmh || 0), 0) / registroViaje.length)
+                    : 0,
+                lean_max_grados: Math.round(Math.abs(maxLeanAngle)),
+                gforce_max: registroViaje.reduce((acc, r) => Math.max(acc, Number(r.gforce || 0)), 0),
+                tiempo_0_60_s: tiempo060,
+                tiempo_0_100_s: tiempo0100
+            }
+        },
+        records: registroViaje
+    };
+}
+
+async function enviarDatosServidor() {
+    if (!registroViaje.length) {
+        alert('Todavía no hay datos para enviar.');
+        return;
+    }
+
+    const saved = getServerUrl();
+    const input = window.prompt('URL del endpoint (POST JSON):', saved || 'https://tu-servidor.com/api/telemetria');
+    if (!input) return;
+
+    const url = input.trim();
+    if (!/^https?:\/\//i.test(url)) {
+        alert('La URL debe empezar con http:// o https://');
+        return;
+    }
+
+    setServerUrl(url);
+
+    if (btnEnviarServidor) {
+        btnEnviarServidor.disabled = true;
+        btnEnviarServidor.innerText = 'Enviando...';
+    }
+
+    try {
+        const payload = construirPayloadViaje();
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        alert('Datos enviados al servidor con éxito.');
+    } catch (error) {
+        alert(`No se pudo enviar al servidor: ${error.message}`);
+    } finally {
+        if (btnEnviarServidor) {
+            btnEnviarServidor.disabled = false;
+            btnEnviarServidor.innerText = 'Enviar';
+        }
+    }
+}
+
 // ==========================================
 // INICIO DE TELEMETRÍA
 // ==========================================
@@ -254,6 +415,23 @@ function iniciarTelemetria() {
     gForceActual = 0;
     ultimoRegistro = null;
     velocidadAnteriorGPS = 0;
+    velocidadMsActual = 0;
+    latitudActual = null;
+    longitudActual = null;
+    precisionGpsActual = null;
+    altitudActual = null;
+    headingActual = null;
+    orientacionPantalla = 0;
+    betaActual = null;
+    gammaActual = null;
+    accelX = 0;
+    accelY = 0;
+    accelZ = 0;
+    accelGX = 0;
+    accelGY = 0;
+    accelGZ = 0;
+    tiempo060 = null;
+    tiempo0100 = null;
     tiempoInicioViaje = Date.now();
 
     limpiarRespaldoLocal();
@@ -276,9 +454,28 @@ function iniciarTelemetria() {
 function registrarDato() {
     registroViaje.push({
         tiempo: new Date().toISOString(),
+        latitud: latitudActual,
+        longitud: longitudActual,
+        precision_gps_m: precisionGpsActual,
+        altitud_m: altitudActual,
+        heading_deg: headingActual,
+        velocidad_ms: Number(velocidadMsActual.toFixed(3)),
         velocidad_kmh: velocidadActual,
+        orientacion_pantalla_deg: orientacionPantalla,
+        beta: betaActual,
+        gamma: gammaActual,
         inclinacion_grados: inclinacionActual,
-        gforce: gForceActual
+        accel_x_ms2: Number(accelX.toFixed(3)),
+        accel_y_ms2: Number(accelY.toFixed(3)),
+        accel_z_ms2: Number(accelZ.toFixed(3)),
+        accel_gx_ms2: Number(accelGX.toFixed(3)),
+        accel_gy_ms2: Number(accelGY.toFixed(3)),
+        accel_gz_ms2: Number(accelGZ.toFixed(3)),
+        gforce: Number(gForceActual.toFixed(3)),
+        estado_semaforo: textoSemaforo.innerText,
+        midiendo_lanzamiento: midiendoAceleracion,
+        tiempo_0_60_s: tiempo060,
+        tiempo_0_100_s: tiempo0100
     });
 
     actualizarStats();
@@ -377,21 +574,32 @@ function abortarLaunchControl(motivo) {
 // ==========================================
 function manejarAcelerometro(evento) {
     // Calcular G-Force
-    let acc = evento.accelerationIncludingGravity;
+    const acc = evento.accelerationIncludingGravity;
+    const accelLineal = evento.acceleration;
+
     if (acc && acc.x !== null) {
-        let gx = acc.x / 9.81;
-        let gy = acc.y / 9.81;
-        let gz = acc.z / 9.81;
+        accelGX = Number(acc.x || 0);
+        accelGY = Number(acc.y || 0);
+        accelGZ = Number(acc.z || 0);
+
+        let gx = accelGX / 9.81;
+        let gy = accelGY / 9.81;
+        let gz = accelGZ / 9.81;
         gForceActual = Math.sqrt(gx*gx + gy*gy + gz*gz) - 1; // Restar gravedad
         gForceActual = Math.abs(gForceActual);
+    }
+
+    if (accelLineal && accelLineal.x !== null) {
+        accelX = Number(accelLineal.x || 0);
+        accelY = Number(accelLineal.y || 0);
+        accelZ = Number(accelLineal.z || 0);
     }
 
     // Launch control por movimiento
     if (!grabando) return;
     if (velocidadActual === 0 && !midiendoAceleracion && textoSemaforo.innerText === "ARMADO") {
-        let accel = evento.acceleration;
-        if (!accel || accel.x === null) return;
-        let fuerzaMovimiento = Math.sqrt(accel.x*accel.x + accel.y*accel.y + accel.z*accel.z);
+        if (!accelLineal || accelLineal.x === null) return;
+        let fuerzaMovimiento = Math.sqrt(accelLineal.x*accelLineal.x + accelLineal.y*accelLineal.y + accelLineal.z*accelLineal.z);
         if (fuerzaMovimiento > LAUNCH_MIN_MOTION_MS2) {
             dispararLaunchControl();
         }
@@ -404,6 +612,10 @@ function manejarAcelerometro(evento) {
 function manejarInclinacion(evento) {
     if (!grabando) return;
     let orientacion = (screen.orientation || {}).angle || window.orientation || 0;
+    orientacionPantalla = Number(orientacion || 0);
+    betaActual = evento.beta !== null ? Number(evento.beta) : null;
+    gammaActual = evento.gamma !== null ? Number(evento.gamma) : null;
+
     let roll = (orientacion === 90 || orientacion === -90) ? evento.beta : evento.gamma;
     if (roll !== null) {
         inclinacionActual = Math.round(roll);
@@ -417,8 +629,15 @@ function manejarInclinacion(evento) {
 function manejarGPS(posicion) {
     if (!grabando) return;
 
+    latitudActual = Number(posicion.coords.latitude);
+    longitudActual = Number(posicion.coords.longitude);
+    precisionGpsActual = posicion.coords.accuracy !== null ? Number(posicion.coords.accuracy) : null;
+    altitudActual = posicion.coords.altitude !== null ? Number(posicion.coords.altitude) : null;
+    headingActual = posicion.coords.heading !== null ? Number(posicion.coords.heading) : null;
+
     let velocidad_ms = posicion.coords.speed;
     if (velocidad_ms === null || velocidad_ms < 0) velocidad_ms = 0;
+    velocidadMsActual = Number(velocidad_ms);
     velocidadActual = Math.round(velocidad_ms * 3.6);
     displayVel.innerText = velocidadActual;
 
@@ -479,6 +698,7 @@ function manejarGPS(posicion) {
         // Tiempos
         if (velocidadActual >= 60 && !meta60Alcanzada) {
             meta60Alcanzada = true;
+            tiempo060 = Number(transcurrido);
             display0_60.innerText = transcurrido + "s";
             display0_60.style.color = "#00ff00";
             hablar("Sesenta en " + transcurrido + " segundos");
@@ -486,6 +706,7 @@ function manejarGPS(posicion) {
 
         if (velocidadActual >= 100 && !meta100Alcanzada) {
             meta100Alcanzada = true;
+            tiempo0100 = Number(transcurrido);
             display0_100.innerText = transcurrido + "s";
             display0_100.style.color = "#00ff00";
 
